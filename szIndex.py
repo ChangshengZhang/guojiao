@@ -262,7 +262,7 @@ if __name__  == "__main__":
     plt.plot(extreme_low_point_index,extreme_low_point,"b+",linewidth=5)
 
     plt.plot(revenue,"y")
-    
+
 
 
     plt.grid(True)
