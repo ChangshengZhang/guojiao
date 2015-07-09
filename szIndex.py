@@ -7,20 +7,28 @@
 
 #########################################################################
 
-import os
+# 需要用到 openpyxl 模块读取 excel 文件
 from openpyxl.reader.excel import load_workbook
-import numpy as np
+#import numpy as np
 import matplotlib.pyplot as plt
 
+# 读取excel文件信息
+# 将最高价、最低价、收盘价等信息存入到数组
 def load_data(filename):
+    #载入excel文件数据
+    # ws得到的是文件指针
     wb = load_workbook(filename)
     sheetnames = wb.get_sheet_names()
     ws = wb.get_sheet_by_name(sheetnames[0])
+    # 下面5个数组依次是
+    # 交易时间、最高价、最低价、交易量、收盘价
     stock_date = []
     price_high = []
     price_low = []
     stock_volume = []
     price_closed = []
+    # 循环读取每一行的数据
+    # openpyxl 用 cell(row = , column = ).value 函数得到某个单元格的值
     for rx in range(5,ws.get_highest_row()+1):
         stock_date.append(ws.cell(row =rx ,column = 1).value)
         price_high.append(ws.cell(row=rx,column=2).value)
@@ -30,16 +38,24 @@ def load_data(filename):
 
     return stock_date,price_high,price_low,stock_volume,price_closed
 
+# 得到一级和二级高点
+# 一级高点是指 前后个两个交易日的最高价比当日的最高价低
+# 二级高点是指 前面两个和后面一个一级高点的价格比该一级高点的最高价低
 def get_extreme_high_point(price_high,compared_day):
+    # compared_day 是一级高点比较的时间长度，可以自定义，目前设置的是两天
 
+    #数组成对使用，XX 数组是价格，另一个数组 XX_index 是交易日的索引，即第几个交易日
+    # 一级高点的有关数组
     extreme_high_point = []
     extreme_high_point_index = []
     price_high_new= []
+    # 二级高点的有关数组
     high_point =[]
     high_point_index = []
+    # 卖点的有关数组
     sell_point = []
     sell_point_index = []
-    #新数组
+    #构造一个新数组，在数组最初和最尾各自新增几个数字，避免比较的时候数组长度溢出的问题
     for i in range(compared_day):
         price_high_new.append(price_high[0])
 
@@ -49,7 +65,8 @@ def get_extreme_high_point(price_high,compared_day):
     for i in range(compared_day):
         price_high_new.append(price_high[len(price_high)-1])
 
-
+    # 寻找一级高点
+    # flag是标志符，如果符合一级高点的定义，则 flag设置为1，不符合则为0
     for i in range(len(price_high)):
         flag =1
         for j in range(compared_day*2+1):
@@ -59,9 +76,13 @@ def get_extreme_high_point(price_high,compared_day):
         if flag == 1:
             extreme_high_point_index.append(i)
             extreme_high_point.append(price_high[i])
-
+    # 寻找二级高点
+    # 利用一级高点的数据
+    # flag的用法和寻找一级高点一样
+    # 注意循环的长度，最后一个一级高点是要舍去的，因为此时尚未出现卖点
     for i in range(len(extreme_high_point)-1):
         flag =1
+        # 忽略最先的交易日，避免数组长度溢出
         if i < compared_day:
             continue
         else:
@@ -78,10 +99,14 @@ def get_extreme_high_point(price_high,compared_day):
                         sell_point.append(extreme_high_point[i+1])
                         sell_point_index.append(extreme_high_point_index[i+1])
 
+    # 返回二级高点和卖点
     return high_point,high_point_index,sell_point,sell_point_index
 
     #return extreme_high_point,extreme_high_point_index
 
+# 得到一级和二级低点
+# 思路和寻找一级和二级高点相似
+# 函数的构造过程参加 get_extreme_high_point()
 def get_extreme_low_point(price_low,compared_day):
     extreme_low_point = []
     extreme_low_point_index = []
@@ -133,12 +158,18 @@ def get_extreme_low_point(price_low,compared_day):
     return low_point,low_point_index,buy_point,buy_point_index
     #return extreme_low_point,extreme_low_point_index
 
-#合并两个数组
+# 合并两个数组
+# 因为卖点和买点是两个数组，故需要合并
+# 合并的思路是，按照交易日的大小合并
+# 算法和“两个有序数组合并”相同
 def mix_signal_array(high_point_index,low_point_index):
+    # 两个索引
     temp_high_index = 0
     temp_low_index  = 0
+    # 合并后的数组，第一个是  合并后的交易日索引，第二个是 合并后的 交易信号：buy（b） or sell（s）
     mix_index = []
     mix_signal = []
+    # 合并算法
     for i in range(len(high_point_index)+len(low_point_index)):
 
         if temp_high_index<len(high_point_index) and temp_low_index<len(low_point_index):
@@ -169,6 +200,14 @@ def mix_signal_array(high_point_index,low_point_index):
 #计算收益率
 def cal_revenue(price_closed,mix_index,mix_signal):
 
+    # 将交易信号进一步处理
+    # 因为并非所有的交易信号都需要执行
+    # 交易策略可以自定义
+    # 目前的交易策略是：
+    #   1. 先买后卖，不能做空
+    #   2. 本金为100，只能做一笔买进，之前的仓位不平掉，不能再买进
+
+    # flag 是标志位，取0,1值，依次来判断当前的仓位情况：空仓或满仓
     flag =0
     new_index = []
     new_signal = []
@@ -183,14 +222,18 @@ def cal_revenue(price_closed,mix_index,mix_signal):
                 new_index.append(mix_index[i])
                 new_signal.append(mix_signal[i])
                 flag =0
+
+    # flag的用法同上
     flag =0
     revenue = []
     action_index =0
-    #base 上一日的资产
+    #base 是上一日的资产
     base =100
     for i in range(len(price_closed)):
         #前一天是空仓
         if flag ==0:
+            # 如果有买进信号的话，按照当天收盘价买入
+            # 否则一直空仓
             if i ==new_index[action_index] and new_signal[action_index] =='b':
                 revenue.append(base)
                 flag =1
@@ -198,10 +241,13 @@ def cal_revenue(price_closed,mix_index,mix_signal):
                 if action_index == len(new_index):
                     action_index = action_index-1
             else:
+
                 revenue.append(base)
 
         #前一天有仓位
         else:
+            # 如果有卖出信号，则按照当天收盘价卖出
+            # 否则一直持有
             if i == new_index[action_index] and new_signal[action_index]=='s':
                 base = base*price_closed[i]/price_closed[i-1]
                 flag=0
@@ -219,6 +265,36 @@ def cal_revenue(price_closed,mix_index,mix_signal):
     return revenue,new_index,new_signal
 
 
+def cal_annual_rev(revenue,stock_date):
+
+    # 寻找每一年的起始日
+    start_year_index = []
+    last_year = 0
+    annual_rev =[]
+    year_number=[]
+    for i in range(len(stock_date)):
+        temp_date = str(stock_date[i])
+        temp_year = temp_date.split("-")
+
+        if i ==0:
+            last_year =temp_year[0]
+            start_year_index.append(i)
+            year_number.append(last_year)
+        elif i == len(stock_date)-1:
+            start_year_index.append(i)
+        else:
+            if temp_year[0] != last_year:
+                last_year =temp_year[0]
+                start_year_index.append(i)
+                year_number.append(temp_year[0])
+
+
+    for i in range(len(start_year_index)-1):
+        annual_rev.append(revenue[start_year_index[i+1]]/revenue[start_year_index[i]]-1)
+
+
+    return annual_rev,year_number
+
 
 if __name__  == "__main__":
     filename = "shcomp_data.xlsx"
@@ -227,7 +303,7 @@ if __name__  == "__main__":
     stock_date,price_high,price_low,stock_volume,price_closed = load_data(filename)
 
 
-    #得到极大值点
+    #调用函数，得到高点和低点
     extreme_high_point,extreme_high_point_index,sell_point,sell_point_index = get_extreme_high_point(price_high,compared_day)
 
     extreme_low_point, extreme_low_point_index,buy_point,buy_point_index = get_extreme_low_point(price_low,compared_day)
@@ -236,6 +312,7 @@ if __name__  == "__main__":
 
     revenue,new_index,new_signal = cal_revenue(price_closed,mix_index,mix_signal)
 
+    annual_rev,annual_year_number = cal_annual_rev(revenue,stock_date)
 
     # output =open('data.txt','w')
     # output.write("High Point:\n \n")
@@ -248,25 +325,26 @@ if __name__  == "__main__":
     #     output.write("\n")
     #
     # output.close()
-
+    # 输出到文件
     output = open('data.txt','w')
     output.write("result:\n")
-    for i in range(len(revenue)):
-        output.write(str(revenue[i]))
+    for i in range(len(annual_rev)):
+        output.write(str(annual_rev[i]))
         output.write("\n")
     output.close()
 
-    plt.plot(price_high)
-    plt.plot(extreme_high_point_index,extreme_high_point,"r+",linewidth=5)
-    plt.plot(price_low,"g")
-    plt.plot(extreme_low_point_index,extreme_low_point,"b+",linewidth=5)
+    # 画图，需要用到 matplotlib 这个库
+    # plt.plot(price_high)
+    # plt.plot(extreme_high_point_index,extreme_high_point,"r+",linewidth=5)
+    # plt.plot(price_low,"g")
+    # plt.plot(extreme_low_point_index,extreme_low_point,"b+",linewidth=5)
+    #
+    # plt.plot(revenue,"y")
 
-    plt.plot(revenue,"y")
-
-
+    plt.plot(annual_year_number,annual_rev,"r")
 
     plt.grid(True)
     plt.xlabel("Time(day)")
-    plt.ylabel("price")
-    plt.title("High Price")
+    plt.ylabel("Point")
+    plt.title("Annual Revenue")
     plt.show()
