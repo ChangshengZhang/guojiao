@@ -29,12 +29,14 @@ def load_data(filename):
     price_closed = []
     # 循环读取每一行的数据
     # openpyxl 用 cell(row = , column = ).value 函数得到某个单元格的值
+    empty_str=  ws.cell(row=1,column=1).value
     for rx in range(5,ws.get_highest_row()+1):
-        stock_date.append(ws.cell(row =rx ,column = 1).value)
-        price_high.append(ws.cell(row=rx,column=2).value)
-        price_low.append(ws.cell(row=rx,column=3).value)
-        stock_volume.append(ws.cell(row=rx,column=4).value)
-        price_closed.append(ws.cell(row=rx,column=5).value)
+        if ws.cell(row=rx,column=2).value!=empty_str and ws.cell(row=rx,column=3).value!=empty_str:
+            stock_date.append(ws.cell(row =rx ,column = 1).value)
+            price_high.append(ws.cell(row=rx,column=2).value)
+            price_low.append(ws.cell(row=rx,column=3).value)
+            stock_volume.append(ws.cell(row=rx,column=4).value)
+            price_closed.append(ws.cell(row=rx,column=5).value)
 
     return stock_date,price_high,price_low,stock_volume,price_closed
 
@@ -100,7 +102,7 @@ def get_extreme_high_point(price_high,compared_day):
                         sell_point_index.append(extreme_high_point_index[i+1])
 
     # 返回二级高点和卖点
-    return high_point,high_point_index,sell_point,sell_point_index
+    return high_point,high_point_index,sell_point,sell_point_index,extreme_high_point,extreme_high_point_index
 
     #return extreme_high_point,extreme_high_point_index
 
@@ -296,15 +298,48 @@ def cal_annual_rev(revenue,stock_date):
     return annual_rev,year_number
 
 
+
+def cal_bounce_after_fall(high_point_index,price_high,price_low,stock_date):
+    bounce = []
+    temp_date = []
+    buy_date =[]
+    for i in range(len(high_point_index)-1):
+        min = 1000000
+        date = 0
+        if high_point_index[i]>-1:
+            for j in range(high_point_index[i],high_point_index[i+1]+1):
+                if min >price_low[j]:
+                    min = price_low[j]
+                    date =j
+
+
+            if price_high[high_point_index[i]]/min >1.25:
+                a= ("%.3f" % float(1-min/price_high[high_point_index[i]]))
+                b = ("%.3f" % float(price_high[high_point_index[i+1]]/min-1))
+                buy_date.append(stock_date[date])
+
+                temp_date.append([stock_date[high_point_index[i]],min,stock_date[high_point_index[i+1]],a,b])
+
+                bounce.append(price_high[high_point_index[i+1]]/min-1)
+
+
+
+    return bounce,temp_date,buy_date
+
+
+
+
+
+
 if __name__  == "__main__":
-    filename = "shcomp_data.xlsx"
+    filename = "sp500.xlsx"
     #比较的时间长度
-    compared_day = 2
+    compared_day = 5
     stock_date,price_high,price_low,stock_volume,price_closed = load_data(filename)
 
 
     #调用函数，得到高点和低点
-    extreme_high_point,extreme_high_point_index,sell_point,sell_point_index = get_extreme_high_point(price_high,compared_day)
+    extreme_high_point,extreme_high_point_index,sell_point,sell_point_index,high_point,high_point_index = get_extreme_high_point(price_high,compared_day)
 
     extreme_low_point, extreme_low_point_index,buy_point,buy_point_index = get_extreme_low_point(price_low,compared_day)
 
@@ -313,6 +348,8 @@ if __name__  == "__main__":
     revenue,new_index,new_signal = cal_revenue(price_closed,mix_index,mix_signal)
 
     annual_rev,annual_year_number = cal_annual_rev(revenue,stock_date)
+
+    bounce,temp_data,buy_date = cal_bounce_after_fall(high_point_index,price_high,price_low,stock_date)
 
     # output =open('data.txt','w')
     # output.write("High Point:\n \n")
@@ -326,10 +363,15 @@ if __name__  == "__main__":
     #
     # output.close()
     # 输出到文件
-    output = open('data.txt','w')
+
+    output_filename = filename+"_data.txt"
+    output = open(output_filename,'w')
     output.write("result:\n")
-    for i in range(len(annual_rev)):
-        output.write(str(annual_rev[i]))
+    output.write("First high point      Low point        Second high point  Fall rate    Up rate \n")
+    for i in range(len(temp_data)):
+        for j in range(5):
+            output.write(str(temp_data[i][j]))
+            output.write("     ")
         output.write("\n")
     output.close()
 
@@ -340,11 +382,11 @@ if __name__  == "__main__":
     # plt.plot(extreme_low_point_index,extreme_low_point,"b+",linewidth=5)
     #
     # plt.plot(revenue,"y")
-
-    plt.plot(annual_year_number,annual_rev,"r")
+    plt.plot(bounce)
+    #plt.plot(annual_year_number,annual_rev,"r")
 
     plt.grid(True)
     plt.xlabel("Time(day)")
     plt.ylabel("Point")
-    plt.title("Annual Revenue")
+    plt.title("Up rate")
     plt.show()
