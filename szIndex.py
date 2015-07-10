@@ -32,7 +32,8 @@ def load_data(filename):
     empty_str=  ws.cell(row=1,column=1).value
     for rx in range(5,ws.get_highest_row()+1):
         if ws.cell(row=rx,column=2).value!=empty_str and ws.cell(row=rx,column=3).value!=empty_str:
-            stock_date.append(ws.cell(row =rx ,column = 1).value)
+            date = str(ws.cell(row =rx ,column = 1).value)
+            stock_date.append(date.split(" ")[0])
             price_high.append(ws.cell(row=rx,column=2).value)
             price_low.append(ws.cell(row=rx,column=3).value)
             stock_volume.append(ws.cell(row=rx,column=4).value)
@@ -299,14 +300,18 @@ def cal_annual_rev(revenue,stock_date):
 
 
 
-def cal_bounce_after_fall(high_point_index,price_high,price_low,stock_date):
+def cal_bounce_after_fall(filename,high_point_index,price_high,price_low,stock_date):
     bounce = []
     temp_date = []
-    buy_date =[]
+    temp_filename =-1
+    # 上证只取2000年之后的数据
+    if filename=="sz.xlsx":
+        temp_filename =2000
     for i in range(len(high_point_index)-1):
         min = 1000000
         date = 0
-        if high_point_index[i]>-1:
+
+        if high_point_index[i]>temp_filename:
             for j in range(high_point_index[i],high_point_index[i+1]+1):
                 if min >price_low[j]:
                     min = price_low[j]
@@ -314,17 +319,18 @@ def cal_bounce_after_fall(high_point_index,price_high,price_low,stock_date):
 
 
             if price_high[high_point_index[i]]/min >1.25:
-                a= ("%.3f" % float(1-min/price_high[high_point_index[i]]))
-                b = ("%.3f" % float(price_high[high_point_index[i+1]]/min-1))
-                buy_date.append(stock_date[date])
+                a= ("%.1f" % float((1-min/price_high[high_point_index[i]])*100))
+                b = ("%.1f" % float((price_high[high_point_index[i+1]]/min-1)*100))
 
-                temp_date.append([stock_date[high_point_index[i]],min,stock_date[high_point_index[i+1]],a,b])
+                #第一个高点日期，点数，最低点日期，点数，下跌天数，下跌幅度，第二个高点日期，点数，上涨天数，上涨幅度
+                temp_date.append([stock_date[high_point_index[i]],int(price_high[high_point_index[i]]),stock_date[date],int(min),date-high_point_index[i],
+                                  a,stock_date[high_point_index[i+1]],int(price_high[high_point_index[i+1]]),high_point_index[i+1]-date,b])
 
                 bounce.append(price_high[high_point_index[i+1]]/min-1)
 
 
 
-    return bounce,temp_date,buy_date
+    return bounce,temp_date
 
 
 
@@ -349,7 +355,7 @@ if __name__  == "__main__":
 
     annual_rev,annual_year_number = cal_annual_rev(revenue,stock_date)
 
-    bounce,temp_data,buy_date = cal_bounce_after_fall(high_point_index,price_high,price_low,stock_date)
+    bounce,temp_data = cal_bounce_after_fall(filename,high_point_index,price_high,price_low,stock_date)
 
     # output =open('data.txt','w')
     # output.write("High Point:\n \n")
@@ -364,16 +370,47 @@ if __name__  == "__main__":
     # output.close()
     # 输出到文件
 
+
     output_filename = filename+"_data.txt"
     output = open(output_filename,'w')
-    output.write("result:\n")
-    output.write("First high point      Low point        Second high point  Fall rate    Up rate \n")
+    str_title = "高点一日期 & 点数 & 最低点日期 & 点数 & $\downarrow$ 天 &$\downarrow$幅度 & 高点二日期 & 点数 & $\uparrow$天& $\uparrow$ 幅度 \\\ \hline"
+    output.write(str_title)
+    output.write("\n")
+    a =0
+    b =0
+    c= 0
+    d=0
     for i in range(len(temp_data)):
-        for j in range(5):
-            output.write(str(temp_data[i][j]))
-            output.write("     ")
+        for j in range(len(temp_data[0])):
+            if j == 4:
+                a =a + float(temp_data[i][j])
+            if j ==5:
+                b = b+ float(temp_data[i][j])
+            if j ==8:
+                c = c+ float(temp_data[i][j])
+            if j ==9:
+                d =d+ float(temp_data[i][j])
+
+            if j ==5:
+                output.write("\\textcolor{blue}{")
+                output.write(str(temp_data[i][j]))
+                output.write("\%")
+                output.write("}")
+            elif j==9:
+                output.write("\\textcolor{red}{")
+                output.write(str(temp_data[i][j]))
+                output.write("\%")
+                output.write("}")
+            else:
+                output.write(str(temp_data[i][j]))
+
+            if j != len(temp_data[0])-1:
+                output.write(" & ")
+        output.write("  \\\  \hline")
         output.write("\n")
     output.close()
+
+    print  a/len(temp_data),b/len(temp_data),c/len(temp_data),d/len(temp_data)
 
     # 画图，需要用到 matplotlib 这个库
     # plt.plot(price_high)
