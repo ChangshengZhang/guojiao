@@ -201,7 +201,7 @@ def mix_signal_array(high_point_index,low_point_index):
     return mix_index,mix_signal
 
 #计算收益率
-def cal_revenue(price_closed,mix_index,mix_signal):
+def cal_revenue(price_closed,mix_index,mix_signal,trade_discounter =1):
 
     # 将交易信号进一步处理
     # 因为并非所有的交易信号都需要执行
@@ -209,9 +209,11 @@ def cal_revenue(price_closed,mix_index,mix_signal):
     # 目前的交易策略是：
     #   1. 先买后卖，不能做空
     #   2. 本金为100，只能做一笔买进，之前的仓位不平掉，不能再买进
+    #   3. 交易费用为 0.1%，买进卖出都要计算
 
     # flag 是标志位，取0,1值，依次来判断当前的仓位情况：空仓或满仓
     flag =0
+    # new_index, new_signal 的值分别是需要买进或者卖出的日期及交易行为（买或卖）
     new_index = []
     new_signal = []
     for i in range(len(mix_index)):
@@ -238,6 +240,7 @@ def cal_revenue(price_closed,mix_index,mix_signal):
             # 如果有买进信号的话，按照当天收盘价买入
             # 否则一直空仓
             if i ==new_index[action_index] and new_signal[action_index] =='b':
+                base = base*trade_discounter
                 revenue.append(base)
                 flag =1
                 action_index =action_index+1
@@ -257,6 +260,7 @@ def cal_revenue(price_closed,mix_index,mix_signal):
                 action_index =action_index+1
                 if action_index == len(new_index):
                     action_index =action_index-1
+                base =base*trade_discounter
                 revenue.append(base)
             #继续持仓
             else:
@@ -267,7 +271,7 @@ def cal_revenue(price_closed,mix_index,mix_signal):
 
     return revenue,new_index,new_signal
 
-
+# 计算年化收益率
 def cal_annual_rev(revenue,stock_date):
 
     # 寻找每一年的起始日
@@ -299,7 +303,7 @@ def cal_annual_rev(revenue,stock_date):
     return annual_rev,year_number
 
 
-
+# 快速下跌后的反弹收益情况
 def cal_bounce_after_fall(filename,high_point_index,price_high,price_low,stock_date):
     bounce = []
     temp_date = []
@@ -334,11 +338,8 @@ def cal_bounce_after_fall(filename,high_point_index,price_high,price_low,stock_d
 
 
 
-
-
-
 if __name__  == "__main__":
-    filename = "sp500.xlsx"
+    filename = "sz.xlsx"
     #比较的时间长度
     compared_day = 5
     stock_date,price_high,price_low,stock_volume,price_closed = load_data(filename)
@@ -349,11 +350,17 @@ if __name__  == "__main__":
 
     extreme_low_point, extreme_low_point_index,buy_point,buy_point_index = get_extreme_low_point(price_low,compared_day)
 
+    # 得到混合后的数组
     mix_index,mix_signal = mix_signal_array(sell_point_index,buy_point_index)
 
+    #计算收益，分别计算不考虑交易费用和考虑交易费用的收益
     revenue,new_index,new_signal = cal_revenue(price_closed,mix_index,mix_signal)
+    revenue_discounter,new_index_discounter,new_signal_discounter = cal_revenue(price_closed,mix_index,mix_signal,0.999)
 
+    #计算年华收益率，分别计算不考虑交易费用和不考虑交易费用
     annual_rev,annual_year_number = cal_annual_rev(revenue,stock_date)
+    annual_rev_discounter,annual_year_number_discounter = cal_annual_rev(revenue_discounter,stock_date)
+
 
     bounce,temp_data = cal_bounce_after_fall(filename,high_point_index,price_high,price_low,stock_date)
 
@@ -371,46 +378,46 @@ if __name__  == "__main__":
     # 输出到文件
 
 
-    output_filename = filename+"_data.txt"
-    output = open(output_filename,'w')
-    str_title = "高点一日期 & 点数 & 最低点日期 & 点数 & $\downarrow$ 天 &$\downarrow$幅度 & 高点二日期 & 点数 & $\uparrow$天& $\uparrow$ 幅度 \\\ \hline"
-    output.write(str_title)
-    output.write("\n")
-    a =0
-    b =0
-    c= 0
-    d=0
-    for i in range(len(temp_data)):
-        for j in range(len(temp_data[0])):
-            if j == 4:
-                a =a + float(temp_data[i][j])
-            if j ==5:
-                b = b+ float(temp_data[i][j])
-            if j ==8:
-                c = c+ float(temp_data[i][j])
-            if j ==9:
-                d =d+ float(temp_data[i][j])
-
-            if j ==5:
-                output.write("\\textcolor{blue}{")
-                output.write(str(temp_data[i][j]))
-                output.write("\%")
-                output.write("}")
-            elif j==9:
-                output.write("\\textcolor{red}{")
-                output.write(str(temp_data[i][j]))
-                output.write("\%")
-                output.write("}")
-            else:
-                output.write(str(temp_data[i][j]))
-
-            if j != len(temp_data[0])-1:
-                output.write(" & ")
-        output.write("  \\\  \hline")
-        output.write("\n")
-    output.close()
-
-    print  a/len(temp_data),b/len(temp_data),c/len(temp_data),d/len(temp_data)
+    # output_filename = filename+"_data.txt"
+    # output = open(output_filename,'w')
+    # str_title = "高点一日期 & 点数 & 最低点日期 & 点数 & $\downarrow$ 天 &$\downarrow$幅度 & 高点二日期 & 点数 & $\uparrow$天& $\uparrow$ 幅度 \\\ \hline"
+    # output.write(str_title)
+    # output.write("\n")
+    # a =0
+    # b =0
+    # c= 0
+    # d=0
+    # for i in range(len(temp_data)):
+    #     for j in range(len(temp_data[0])):
+    #         if j == 4:
+    #             a =a + float(temp_data[i][j])
+    #         if j ==5:
+    #             b = b+ float(temp_data[i][j])
+    #         if j ==8:
+    #             c = c+ float(temp_data[i][j])
+    #         if j ==9:
+    #             d =d+ float(temp_data[i][j])
+    #
+    #         if j ==5:
+    #             output.write("\\textcolor{blue}{")
+    #             output.write(str(temp_data[i][j]))
+    #             output.write("\%")
+    #             output.write("}")
+    #         elif j==9:
+    #             output.write("\\textcolor{red}{")
+    #             output.write(str(temp_data[i][j]))
+    #             output.write("\%")
+    #             output.write("}")
+    #         else:
+    #             output.write(str(temp_data[i][j]))
+    #
+    #         if j != len(temp_data[0])-1:
+    #             output.write(" & ")
+    #     output.write("  \\\  \hline")
+    #     output.write("\n")
+    # output.close()
+    #
+    # print  a/len(temp_data),b/len(temp_data),c/len(temp_data),d/len(temp_data)
 
     # 画图，需要用到 matplotlib 这个库
     # plt.plot(price_high)
@@ -418,12 +425,19 @@ if __name__  == "__main__":
     # plt.plot(price_low,"g")
     # plt.plot(extreme_low_point_index,extreme_low_point,"b+",linewidth=5)
     #
-    # plt.plot(revenue,"y")
-    plt.plot(bounce)
-    #plt.plot(annual_year_number,annual_rev,"r")
 
+
+    # plt.plot(revenue,"b",label = "No trading fee")
+    # plt.plot(revenue_discounter,"r", label = "Trading fee is 0.1%")
+
+
+    #plt.plot(bounce)
+    plt.plot(annual_year_number,annual_rev,"b",label = "No trading fee")
+    plt.plot(annual_year_number_discounter,annual_rev_discounter,"r",label = "Trading fee is 0.1%")
+
+    plt.legend(loc='upper left')
     plt.grid(True)
     plt.xlabel("Time(day)")
     plt.ylabel("Point")
-    plt.title("Up rate")
+    plt.title("Revenue")
     plt.show()
