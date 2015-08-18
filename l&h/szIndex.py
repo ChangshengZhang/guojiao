@@ -364,6 +364,7 @@ if __name__  == "__main__":
 
     bounce,temp_data = cal_bounce_after_fall(filename,high_point_index,price_high,price_low,stock_date)
 
+
     # output =open('data.txt','w')
     # output.write("High Point:\n \n")
     # for i in range(len(extreme_high_point)):
@@ -432,8 +433,11 @@ if __name__  == "__main__":
 
 
     #plt.plot(bounce)
-    plt.plot(annual_year_number,annual_rev,"b",label = "No trading fee")
-    plt.plot(annual_year_number_discounter,annual_rev_discounter,"r",label = "Trading fee is 0.1%")
+    #plt.plot(annual_year_number,annual_rev,"b",label = "No trading fee")
+    #plt.plot(annual_year_number_discounter,annual_rev_discounter,"r",label = "Trading fee is 0.1%")
+    plt.plot(revenue,"b",label = "No trading fee")
+    plt.plot(revenue_discounter,"r",label = "Trading fee is 0.1%")
+
 
     plt.legend(loc='upper left')
     plt.grid(True)
